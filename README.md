@@ -34,6 +34,7 @@ on a small set of tools (notably `bash`) rather than many specialised ones.
 - [Local OpenAI-compatible servers (e.g. LM Studio)](#local-openai-compatible-servers-eg-lm-studio)
 - [Architecture](#architecture)
 - [Reading the code](#reading-the-code)
+- [Playing around](#playing-around)
 - [Adding a tool](#adding-a-tool)
 - [Building a REPL](#building-a-repl)
 - [Security](#security)
@@ -334,6 +335,129 @@ Key concepts to watch for while reading:
   mode ends on a `Final Answer:` line.
 - **Nonce stop sequences**: random-suffixed `Observation:` labels prevent the
   model from truncating its own generation mid-tool-call.
+
+## Playing around
+
+The fastest way to understand klauscode is to run it, break it, and extend it.
+
+### 1. Run it end-to-end
+
+```sh
+export OPENAI_API_KEY=sk-...
+go run ./cmd/klauscode "What is (12 * 9) + 3?"
+```
+
+Watch **stderr** for the Thought/Action/Observation trace; **stdout** holds just
+the final answer:
+
+```sh
+go run ./cmd/klauscode "What is 7 * 6?" 2>/dev/null
+# 42
+```
+
+### 2. Compare native vs. text mode
+
+Run the same task in both modes to see the different traces:
+
+```sh
+# native (default): structured tool_calls, no free-text parsing
+OPENAI_TOOL_CALLING=native go run ./cmd/klauscode "Read README.md and tell me the temperature default"
+
+# text: ReAct Action:/Final Answer: parsing
+OPENAI_TOOL_CALLING=text go run ./cmd/klauscode "Read README.md and tell me the temperature default"
+```
+
+### 3. Add a tool
+
+Copy `internal/tools/calculate/` to `internal/tools/flipcoin/`:
+
+```go
+package flipcoin
+
+import "math/rand"
+
+type FlipCoin struct{}
+
+func New() *FlipCoin { return &FlipCoin{} }
+
+func (f *FlipCoin) Name() string { return "flipcoin" }
+
+func (f *FlipCoin) Description() string {
+    return "Flip a coin and return heads or tails."
+}
+
+func (f *FlipCoin) Call(args string) (string, error) {
+    if rand.Intn(2) == 0 {
+        return "heads", nil
+    }
+    return "tails", nil
+}
+```
+
+Register it in `cmd/klauscode/main.go`:
+
+```go
+registry.Register(flipcoin.New())
+```
+
+Then ask:
+
+```sh
+go run ./cmd/klauscode "Flip a coin three times and tell me the results"
+```
+
+The model discovers and calls your new tool automatically through the registry —
+no prompt edits needed.
+
+### 4. Break the repeatGuard
+
+With `temperature=0` the model is deterministic and can get stuck re-requesting
+the same tool call:
+
+```sh
+OPENAI_TEMPERATURE=0 go run ./cmd/klauscode "Keep calling calculate until the result is 100"
+```
+
+You should see the `repeatGuard` fire: “you have now requested this exact … call
+N times in a row with identical arguments.” Then try again with
+`OPENAI_TEMPERATURE=0.7` — it usually escapes.
+
+### 5. Read the tests
+
+```sh
+go test ./... -cover
+```
+
+Tests use `httptest` and a scripted fake `llm.Client`, so no network or API key
+is needed. `internal/agent/agent_test.go` shows how the loop is driven
+deterministically — the best way to understand the expected message flow.
+
+### 6. Suggested reading order
+
+| File | What you learn |
+|------|---------------|
+| `cmd/klauscode/main.go` | Composition root: client, registry, instructions, skills |
+| `internal/agent/agent.go` | The ReAct loop: `runNative`, `runText`, `repeatGuard`, `runTool` |
+| `internal/agent/parser.go` | Parsing `Action:` / `Final Answer:` from free text |
+| `internal/agent/prompt.go` | System prompt generated from the tool registry |
+| `internal/llm/client.go` | Dependency-free OpenAI client (transport layer) |
+| `internal/tools/tool.go` + `registry.go` | The `Tool` interface and auto-registration |
+| `internal/tools/calculate/calculate.go` | Minimal concrete tool example |
+
+### 7. Try the REPL
+
+See [Building a REPL](#building-a-repl) for an interactive wrapper that reuses
+`agent.Agent` across `Run` calls. Notice each turn starts fresh — no memory
+between turns is a deliberate klauscode limitation.
+
+### 8. Mutations to try
+
+Change one thing at a time:
+
+- `defaultMaxSteps` in `agent.go` from `1000` to `5` — see the step-limit error.
+- `defaultMaxRepeats` from `3` to `1` — the repeatGuard aborts faster.
+- `OPENAI_BASE_URL=http://127.0.0.1:1234/v1` — point at a local LM Studio /
+  Ollama server to see the text fallback in action.
 
 ## Adding a tool
 
