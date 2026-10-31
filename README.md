@@ -2,8 +2,6 @@
 
 [Klaus Code: Writing Your Own AI Agent From Scratch in Go](https://www.raphaelbauer.com/posts/klauscode-ai-agent/)
 
-[![CI](https://github.com/raphaelbauer/klauscode/actions/workflows/ci.yml/badge.svg)](https://github.com/raphaelbauer/klauscode/actions/workflows/ci.yml)
-
 A small, dependency-free **AI harness** in Go. It drives an OpenAI model through
 a tool-calling loop: the model requests tools, the harness intercepts and
 executes them, feeds the results back, and repeats until the model produces a
