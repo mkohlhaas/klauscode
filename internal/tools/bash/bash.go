@@ -73,8 +73,7 @@ func (t *BashTool) Call(args string) (string, error) {
 		return out + fmt.Sprintf("\n[timed out after %s]", t.timeout), nil
 	}
 	if runErr != nil {
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](runErr); ok {
 			return out + fmt.Sprintf("\n[exit code: %d]", exitErr.ExitCode()), nil
 		}
 		// Could not start the command at all (e.g. sh not found).

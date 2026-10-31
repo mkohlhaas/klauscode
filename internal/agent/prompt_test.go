@@ -40,7 +40,6 @@ func TestFirstInstructionFile(t *testing.T) {
 
 			// when reading the first instruction file
 			got, err := firstInstructionFile(dir)
-
 			// then the expected contents come back with no error
 			if err != nil {
 				t.Fatalf("firstInstructionFile returned error: %v", err)
@@ -56,7 +55,6 @@ func TestFirstInstructionFileEmptyDir(t *testing.T) {
 	// given an empty dir argument (home lookup failed)
 	// when reading
 	got, err := firstInstructionFile("")
-
 	// then it yields no content and no error
 	if err != nil {
 		t.Fatalf("firstInstructionFile returned error: %v", err)
@@ -186,7 +184,7 @@ func TestBuildSystemPromptWithSkills(t *testing.T) {
 	skillsAt := strings.Index(prompt, "AGENT SKILLS")
 	instrAt := strings.Index(prompt, "USER & PROJECT INSTRUCTIONS")
 	footerAt := strings.Index(prompt, "Let's begin.")
-	if !(skillsAt < instrAt && instrAt < footerAt) {
+	if skillsAt >= instrAt || instrAt >= footerAt {
 		t.Errorf("section order wrong: skills=%d instructions=%d footer=%d", skillsAt, instrAt, footerAt)
 	}
 }

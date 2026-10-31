@@ -2,6 +2,7 @@ package agent
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"klauscode/internal/tools/textutil"
@@ -174,8 +175,8 @@ func scanBalancedArgs(s string) (args, rest string, found bool) {
 // (e.g. an unterminated quote), where a live tool call sits on the final line.
 func lastNonEmptyLine(s string) string {
 	lines := strings.Split(s, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if t := strings.TrimSpace(lines[i]); t != "" {
+	for _, line := range slices.Backward(lines) {
+		if t := strings.TrimSpace(line); t != "" {
 			return t
 		}
 	}
@@ -188,7 +189,7 @@ func lastNonEmptyLine(s string) string {
 // word is removed; the text after it — which is the actual answer — is kept.
 func stripThoughtPrefix(s string) string {
 	s = strings.TrimSpace(s)
-	if t := strings.TrimPrefix(s, "Thought:"); t != s {
+	if t, ok := strings.CutPrefix(s, "Thought:"); ok {
 		return strings.TrimSpace(t)
 	}
 	return s

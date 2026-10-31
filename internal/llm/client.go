@@ -253,7 +253,7 @@ func (c *OpenAIClient) Complete(ctx context.Context, req Request) (Response, err
 	if err != nil {
 		return Response{}, fmt.Errorf("call openai: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -300,12 +300,8 @@ func toChatTools(specs []ToolSpec) []chatTool {
 	out := make([]chatTool, len(specs))
 	for i, s := range specs {
 		out[i] = chatTool{
-			Type: "function",
-			Function: chatFunction{
-				Name:        s.Name,
-				Description: s.Description,
-				Parameters:  s.Parameters,
-			},
+			Type:     "function",
+			Function: chatFunction(s),
 		}
 	}
 	return out

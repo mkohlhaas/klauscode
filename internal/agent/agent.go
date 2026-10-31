@@ -234,8 +234,7 @@ func (a *Agent) Run(ctx context.Context, task string) (string, error) {
 		// implement the tools field. A transport error, or a failure after the run
 		// has already progressed, is a genuine error and is surfaced as-is.
 		if err != nil && !startedOK {
-			var se *llm.StatusError
-			if errors.As(err, &se) {
+			if _, ok := errors.AsType[*llm.StatusError](err); ok {
 				a.tracef("--- native tool-calling unsupported (%v); falling back to text mode ---\n", err)
 				return a.runText(ctx, task)
 			}
@@ -363,7 +362,7 @@ func (a *Agent) runNative(ctx context.Context, task string) (answer string, star
 	// and must not carry one run's history into the next.
 	var guard repeatGuard
 
-	for i := 0; i < a.maxSteps; i++ {
+	for i := range a.maxSteps {
 		resp, err := a.client.Complete(ctx, llm.Request{Messages: messages, Tools: specs})
 		if err != nil {
 			return "", startedOK, fmt.Errorf("model call failed: %w", err)
@@ -473,6 +472,6 @@ func (a *Agent) runTool(step Step) string {
 
 func (a *Agent) tracef(format string, args ...any) {
 	if a.trace != nil {
-		fmt.Fprintf(a.trace, format, args...)
+		_, _ = fmt.Fprintf(a.trace, format, args...)
 	}
 }

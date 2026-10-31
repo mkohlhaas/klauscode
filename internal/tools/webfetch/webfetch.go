@@ -65,7 +65,7 @@ func (t *WebFetchTool) Call(args string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("web_fetch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

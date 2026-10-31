@@ -133,7 +133,7 @@ func BuildSystemPrompt(reg *tools.Registry, skillsCatalog, instructions, nonce s
 		b.WriteString(s)
 		b.WriteString("\n")
 	}
-	b.WriteString(fmt.Sprintf(promptFooterTemplate, nonce))
+	fmt.Fprintf(&b, promptFooterTemplate, nonce)
 	return b.String()
 }
 
