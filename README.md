@@ -266,6 +266,40 @@ No third-party dependencies — only the Go standard library. The web tools scra
 DuckDuckGo's HTML and strip pages to text with `regexp` + the stdlib `html`
 package rather than pulling in an HTML library.
 
+## Reading the code
+
+The repository is intentionally small (~4k lines of Go) and dependency-free, so
+you can read the whole agent loop end-to-end in a single sitting. Suggested
+order:
+
+1. [`cmd/klauscode/main.go`](cmd/klauscode/main.go) — the composition root that wires
+   the LLM client, tool registry, instructions, and skills together.
+2. [`internal/agent/agent.go`](internal/agent/agent.go) — the ReAct loop itself:
+   `runNative` for structured function-calling, `runText` for the ReAct text
+   protocol, and `repeatGuard` for breaking out of identical-tool-call loops.
+3. [`internal/agent/parser.go`](internal/agent/parser.go) and
+   [`internal/agent/prompt.go`](internal/agent/prompt.go) — how tool calls are
+   parsed from free text and how the system prompt is generated from the registry.
+4. [`internal/llm/client.go`](internal/llm/client.go) — the dependency-free OpenAI
+   client that sends `tool_calls` and receives `role:"tool` messages.
+5. [`internal/tools/tool.go`](internal/tools/tool.go) and
+   [`internal/tools/registry.go`](internal/tools/registry.go) — the `Tool`
+   interface and registry that make adding tools automatic.
+6. One concrete tool, e.g.
+   [`internal/tools/calculate/calculate.go`](internal/tools/calculate/calculate.go),
+   to see how little code a tool needs.
+7. [`internal/skills/skills.go`](internal/skills/skills.go) — optional, on-demand
+   capability packets loaded via the `skill` tool.
+
+Key concepts to watch for while reading:
+
+- **Message history as state**: assistant turns and tool results are appended to
+  `messages` and re-sent to the model every request.
+- **Termination signal**: native mode ends when there are no `tool_calls`; text
+  mode ends on a `Final Answer:` line.
+- **Nonce stop sequences**: random-suffixed `Observation:` labels prevent the
+  model from truncating its own generation mid-tool-call.
+
 ## Adding a tool
 
 A tool is anything implementing the `Tool` interface
@@ -291,6 +325,129 @@ type Tool interface {
 The system prompt lists registered tools automatically, so the model learns
 about the new tool with no prompt edits. Tool errors are fed back to the model
 as an observation, letting it self-correct rather than failing the run.
+
+## Building a REPL
+
+klauscode’s `Agent` is reusable across `Run` calls, so you can wrap it in a
+read-eval-print loop. Here is a minimal REPL in a new main package:
+
+```go
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	"klauscode/internal/agent"
+	"klauscode/internal/llm"
+	"klauscode/internal/tools"
+	"klauscode/internal/tools/bash"
+	"klauscode/internal/tools/calculate"
+	"klauscode/internal/tools/editfile"
+	"klauscode/internal/tools/readfile"
+	"klauscode/internal/tools/skill"
+	"klauscode/internal/tools/websearch"
+	"klauscode/internal/tools/webfetch"
+	"klauscode/internal/tools/writefile"
+)
+
+func main() {
+	if err := runRepl(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func runRepl() error {
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" && baseURL == "" {
+		return fmt.Errorf("OPENAI_API_KEY is not set")
+	}
+	if apiKey == "" {
+		apiKey = "not-needed"
+	}
+
+	model := os.Getenv("OPENAI_MODEL")
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+
+	var opts []llm.Option
+	if baseURL != "" {
+		opts = append(opts, llm.WithBaseURL(baseURL))
+	}
+	client := llm.NewOpenAIClient(apiKey, model, opts...)
+
+	registry := tools.NewRegistry()
+	registry.Register(calculate.New())
+	registry.Register(readfile.New())
+	registry.Register(writefile.New())
+	registry.Register(editfile.New())
+	registry.Register(bash.New())
+	registry.Register(websearch.New())
+	registry.Register(webfetch.New())
+
+	discovered, err := skills.Discover("", ".claude")
+	if err != nil {
+		return err
+	}
+	registry.Register(skill.New(discovered))
+
+	ag := agent.New(client, registry,
+		agent.WithTrace(os.Stderr),
+		agent.WithToolCalling(agent.ToolCallingNative),
+	)
+
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("> ")
+		if !scanner.Scan() {
+			break
+		}
+		task := strings.TrimSpace(scanner.Text())
+		if task == "" {
+			continue
+		}
+		if strings.EqualFold(task, "exit") || strings.EqualFold(task, "quit") {
+			break
+		}
+
+		answer, err := ag.Run(context.Background(), task)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			continue
+		}
+		fmt.Println(answer)
+	}
+	return scanner.Err()
+}
+```
+
+Run it:
+
+```sh
+go run ./cmd/klauscode-repl
+> What is 7 * 6?
+# 42
+> Read README.md and summarize it
+# ...
+> exit
+```
+
+Caveats:
+
+- **No memory between turns.** Each `ag.Run` call builds a fresh message history,
+  so the model won’t remember earlier turns unless you re-include them in the
+  task string. Maintain your own history if you want a stateful conversation.
+- **Trace goes to stderr.** The agent’s internal Thought/Action/Observation
+  trace prints to stderr via `agent.WithTrace`, while final answers print to
+  stdout, keeping the REPL readable.
+- **Blocking calls.** `ag.Run` blocks while waiting on the model; `Ctrl+C`
+  interrupts the process.
 
 ## Security
 
