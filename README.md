@@ -336,6 +336,20 @@ Key concepts to watch for while reading:
 - **Nonce stop sequences**: random-suffixed `Observation:` labels prevent the
   model from truncating its own generation mid-tool-call.
 
+### Time estimate
+
+About **3–4 hours** for a solid first-pass understanding:
+
+| Activity | Time |
+|----------|------|
+| Read `main.go` + `agent.go` | 30 min |
+| Run CLI in native and text mode | 30 min |
+| Add a tool (e.g. `flipcoin`) and run it | 1 hour |
+| Read `llm/client.go` + one tool package | 1 hour |
+| Run `go test ./... -cover` and read `agent_test.go` | 1 hour |
+
+The line count (~4k Go) is deceptive: ~1k lines are tests, and each tool package is only 50–150 lines following the same `Tool` interface pattern. The core loop lives almost entirely in `internal/agent/agent.go`.
+
 ## Playing around
 
 The fastest way to understand klauscode is to run it, break it, and extend it.
