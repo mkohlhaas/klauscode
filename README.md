@@ -24,6 +24,25 @@ It ships tools for **coding** (read/write/edit files, run shell commands) and
 design is deliberately minimal — inspired by [Pi](https://pi.dev/), which leans
 on a small set of tools (notably `bash`) rather than many specialised ones.
 
+## Contents
+
+- [How it works](#how-it-works)
+- [Tools](#tools)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Tool calling](#tool-calling)
+- [Instructions files (AGENTS.md / CLAUDE.md)](#instructions-files-agentsmd-claudemd)
+- [Agent Skills (SKILL.md)](#agent-skills-skillmd)
+- [Local OpenAI-compatible servers (e.g. LM Studio)](#local-openai-compatible-servers-eg-lm-studio)
+- [Architecture](#architecture)
+- [Reading the code](#reading-the-code)
+- [Adding a tool](#adding-a-tool)
+- [Building a REPL](#building-a-repl)
+- [Security](#security)
+- [Testing](#testing)
+- [Limitations (proof-of-concept)](#limitations-proof-of-concept)
+- [TODOs](#todos)
+
 ## How it works
 
 ```mermaid
