@@ -266,6 +266,24 @@ OPENAI_MODEL=<your-loaded-model> \
 go run ./cmd/klauscode "What is (12 * 9) + 3?"
 ```
 
+### OpenRouter (free models)
+
+OpenRouter is OpenAI-compatible, so klauscode can point at it with `OPENAI_BASE_URL`. Free models still require an API key — create one at [openrouter.ai/keys](https://openrouter.ai/keys):
+
+```sh
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...
+export OPENAI_MODEL=meta-llama/llama-3.1-8b-instruct:free
+export OPENAI_TOOL_CALLING=text        # safer for models without native tool-calling
+export OPENAI_TEMPERATURE=0.7          # free models often need higher temperature
+
+go run ./cmd/klauscode "What is (12 * 9) + 3?"
+```
+
+Model names include the provider prefix, e.g. `meta-llama/llama-3.1-8b-instruct:free` or `google/gemma-2-9b-it:free`. See [openrouter.ai/models](https://openrouter.ai/models) for the current free list.
+
+Some free models don’t support structured `tool_calls`; if you get errors, try `OPENAI_TOOL_CALLING=text` (ReAct) or `auto` (tries native, falls back to text).
+
 ## Architecture
 
 Layered with interface-based dependency injection so each layer is unit-testable
