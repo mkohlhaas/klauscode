@@ -1,5 +1,7 @@
 # Klaus Code
 
+[Klaus Code: Writing Your Own AI Agent From Scratch in Go](https://www.raphaelbauer.com/posts/klauscode-ai-agent/)
+
 [![CI](https://github.com/raphaelbauer/klauscode/actions/workflows/ci.yml/badge.svg)](https://github.com/raphaelbauer/klauscode/actions/workflows/ci.yml)
 
 A small, dependency-free **AI harness** in Go. It drives an OpenAI model through
@@ -24,14 +26,17 @@ on a small set of tools (notably `bash`) rather than many specialised ones.
 
 ## How it works
 
-```
-┌────────┐  prompt   ┌─────────┐  tool call: calculate(2+3)  ┌──────────┐
-│  user  │──────────▶│  agent  │────────────────────────────▶│  tools   │
-└────────┘           │ (loop)  │◀────────────────────────────│ registry │
-                     └─────────┘  result: 5                  └──────────┘
-                          │  final answer: 5
-                          ▼
-                        stdout
+```mermaid
+flowchart LR
+    user((user))
+    agent([agent<br/>loop])
+    tools([tools<br/>registry])
+    stdout((stdout))
+
+    user -->|prompt| agent
+    agent -->|tool call| tools
+    tools -->|result| agent
+    agent -->|final answer| stdout
 ```
 
 1. The agent sends the system prompt + the user's task to the model, along with
